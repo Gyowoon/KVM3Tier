@@ -1,0 +1,85 @@
+---
+# PostgreSQL 설치
+- name: Install PostgreSQL 16
+  ansible.builtin.dnf:
+    name:
+      - postgresql-server
+      - postgresql-contrib
+      - python3-psycopg2
+    state: present
+
+# PostgreSQL 초기화
+- name: Check if PostgreSQL is initialized
+  ansible.builtin.stat:
+    path: /var/lib/pgsql/data/pg_hba.conf
+  register: pg_data
+
+- name: Initialize PostgreSQL
+  ansible.builtin.command: postgresql-setup --initdb
+  when: not pg_data.stat.exists
+
+# PostgreSQL 시작
+- name: Start and enable PostgreSQL
+  ansible.builtin.systemd:
+    name: postgresql
+    state: started
+    enabled: yes
+
+# postgresql.conf 수정 - 외부 접속 허용
+- name: Configure PostgreSQL to listen on all interfaces
+  ansible.builtin.lineinfile:
+    path: /var/lib/pgsql/data/postgresql.conf
+    regexp: "^#?listen_addresses"
+    line: "listen_addresses = '*'"
+  notify: Restart postgresql
+
+# pg_hba.conf 설정
+- name: Configure pg_hba.conf
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: /var/lib/pgsql/data/pg_hba.conf
+    owner: postgres
+    group: postgres
+    mode: '0600'
+  notify: Restart postgresql
+
+# Firewall 포트 오픈
+- name: Open PostgreSQL port
+  ansible.posix.firewalld:
+    port: 5432/tcp
+    permanent: yes
+    state: enabled
+    immediate: yes
+
+# 데이터베이스 생성
+- name: Create application database
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: "{{ db_name }}"
+    state: present
+
+# 사용자 생성
+- name: Create application user
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    state: present
+
+# 권한 부여
+- name: Grant privileges to user
+  become_user: postgres
+  community.postgresql.postgresql_privs:
+    database: "{{ db_name }}"
+    privs: ALL
+    type: database
+    role: "{{ db_user }}"
+
+- name: Grant schema privileges
+  become_user: postgres
+  community.postgresql.postgresql_privs:
+    database: "{{ db_name }}"
+    privs: ALL
+    type: schema
+    objs: public
+    role: "{{ db_user }}"

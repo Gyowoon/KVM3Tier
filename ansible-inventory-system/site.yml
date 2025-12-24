@@ -1,0 +1,31 @@
+---
+- name: Apply common configuration to all hosts
+  hosts: all
+  become: yes
+  roles:
+    - common
+    - exporters
+
+- name: Configure monitoring server
+  hosts: monitoring
+  become: yes
+  roles:
+    - monitoring
+
+- name: Configure database server
+  hosts: dbservers
+  become: yes
+  roles:
+    - dbserver
+
+- name: Configure application server
+  hosts: appservers
+  become: yes
+  roles:
+    - appserver
+
+- name: Configure web server
+  hosts: webservers
+  become: yes
+  roles:
+    - webserver

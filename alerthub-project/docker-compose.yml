@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: alerthub-db
+    environment:
+      POSTGRES_DB: alerthub
+      POSTGRES_USER: alerthub
+      POSTGRES_PASSWORD: alerthub123
+    volumes:
+      - alerthub_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - alerthub-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alerthub -d alerthub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Message Queue
+  redis:
+    image: redis:7-alpine
+    container_name: alerthub-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - alerthub_redis_data:/data
+    networks:
+      - alerthub-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: alerthub-api
+    environment:
+      DATABASE_URL: postgresql://alerthub:alerthub123@db:5432/alerthub
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8000:8000"
+    networks:
+      - alerthub-net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Notification Worker
+  notifier:
+    build:
+      context: ./notifier
+      dockerfile: Dockerfile
+    container_name: alerthub-notifier
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+    networks:
+      - alerthub-net
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Frontend (Nginx)
+  web:
+    image: nginx:alpine
+    container_name: alerthub-web
+    ports:
+      - "3001:80"
+    volumes:
+      - ./frontend/public:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - alerthub-net
+    depends_on:
+      - api
+    restart: unless-stopped
+
+networks:
+  alerthub-net:
+    driver: bridge
+
+volumes:
+  alerthub_db_data:
+  alerthub_redis_data:

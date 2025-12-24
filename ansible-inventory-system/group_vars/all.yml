@@ -1,0 +1,23 @@
+---
+# Database Configuration
+db_name: myappdb
+db_user: myappuser
+db_password: myapppass123
+db_host: 192.168.10.15
+
+# WildFly Configuration
+wildfly_version: "38.0.0.Final"
+wildfly_user: wildfly
+
+# Prometheus Configuration
+prometheus_version: "2.53.0"
+node_exporter_version: "1.8.1"
+promtail_version: "3.0.0"
+loki_version: "3.0.0"
+alertmanager_version: "0.27.0"
+
+# Network
+gateway: 192.168.10.254
+dns_servers:
+  - 8.8.8.8
+  - 168.126.63.1

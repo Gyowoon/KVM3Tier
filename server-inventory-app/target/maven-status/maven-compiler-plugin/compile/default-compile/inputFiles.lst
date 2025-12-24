@@ -1,0 +1,4 @@
+/root/server-inventory-app/src/main/java/com/example/inventory/resource/RestApplication.java
+/root/server-inventory-app/src/main/java/com/example/inventory/repository/ServerRepository.java
+/root/server-inventory-app/src/main/java/com/example/inventory/resource/ServerResource.java
+/root/server-inventory-app/src/main/java/com/example/inventory/entity/ServerInfo.java

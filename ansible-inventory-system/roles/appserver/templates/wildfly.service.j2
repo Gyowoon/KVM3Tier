@@ -1,0 +1,14 @@
+[Unit]
+Description=WildFly Application Server
+After=network.target
+
+[Service]
+Type=simple
+User=wildfly
+Group=wildfly
+ExecStart=/opt/wildfly/bin/launch.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

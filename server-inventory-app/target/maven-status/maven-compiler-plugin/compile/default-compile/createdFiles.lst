@@ -1,0 +1,4 @@
+com/example/inventory/resource/ServerResource.class
+com/example/inventory/entity/ServerInfo.class
+com/example/inventory/repository/ServerRepository.class
+com/example/inventory/resource/RestApplication.class

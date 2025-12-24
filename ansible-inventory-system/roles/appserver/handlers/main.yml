@@ -1,0 +1,5 @@
+---
+- name: Restart wildfly
+  ansible.builtin.systemd:
+    name: wildfly
+    state: restarted

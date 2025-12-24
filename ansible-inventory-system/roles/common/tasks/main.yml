@@ -1,0 +1,54 @@
+---
+# Fedora DNF5 호환성 (TSR-001)
+- name: Install python3-libdnf5 for Fedora (DNF5)
+  ansible.builtin.raw: dnf install -y python3-libdnf5
+  when: ansible_distribution == "Fedora"
+  changed_when: false
+  check_mode: false
+
+# Fedora SELinux Python 바인딩 설치
+- name: Install python3-libselinux for Fedora
+  ansible.builtin.dnf:
+    name: python3-libselinux
+    state: present
+  when: ansible_distribution == "Fedora"
+
+# 기본 패키지 설치
+- name: Install common packages
+  ansible.builtin.dnf:
+    name:
+      - vim-enhanced
+      - bash-completion
+      - tar
+      - wget
+      - curl
+      - net-tools
+      - bind-utils
+      - acl
+    state: present
+
+# Timezone 설정
+- name: Set timezone to Asia/Seoul
+  ansible.builtin.command: timedatectl set-timezone Asia/Seoul
+  changed_when: false
+
+# SELinux permissive 설정
+- name: Set SELinux to permissive
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+
+# Firewall 활성화
+- name: Ensure firewalld is running
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: yes
+
+# SSH 포트 허용
+- name: Allow SSH through firewall
+  ansible.posix.firewalld:
+    service: ssh
+    permanent: yes
+    state: enabled
+    immediate: yes

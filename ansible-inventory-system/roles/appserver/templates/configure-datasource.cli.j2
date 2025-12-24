@@ -1,0 +1,20 @@
+# Add PostgreSQL JDBC Driver
+/subsystem=datasources/jdbc-driver=postgresql:add( \
+    driver-name=postgresql, \
+    driver-module-name=org.postgresql, \
+    driver-class-name=org.postgresql.Driver, \
+    driver-xa-datasource-class-name=org.postgresql.xa.PGXADataSource \
+)
+
+# Add Datasource
+/subsystem=datasources/data-source=PostgreSQLDS:add( \
+    jndi-name=java:jboss/datasources/PostgreSQLDS, \
+    driver-name=postgresql, \
+    connection-url=jdbc:postgresql://{{ db_host }}:5432/{{ db_name }}, \
+    user-name={{ db_user }}, \
+    password={{ db_password }}, \
+    min-pool-size=5, \
+    max-pool-size=20, \
+    enabled=true, \
+    use-java-context=true \
+)

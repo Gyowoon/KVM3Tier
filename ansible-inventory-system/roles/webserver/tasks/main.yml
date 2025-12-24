@@ -1,0 +1,57 @@
+---
+# Fedora SEmanage Python 바인딩 설치
+- name: Install python3-libsemanage
+  ansible.builtin.dnf:
+    name: python3-libsemanage
+    state: present
+
+# Nginx 설치
+- name: Install Nginx
+  ansible.builtin.dnf:
+    name: nginx
+    state: present
+
+# SELinux boolean 설정 (Nginx가 네트워크 연결 가능하도록)
+- name: Allow Nginx to connect to network
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: yes
+    persistent: yes
+
+# Nginx 설정 파일
+- name: Configure Nginx main config
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    mode: '0644'
+  notify: Restart nginx
+
+# Reverse Proxy 설정
+- name: Configure app proxy
+  ansible.builtin.template:
+    src: app_proxy.conf.j2
+    dest: /etc/nginx/conf.d/app_proxy.conf
+    mode: '0644'
+  notify: Restart nginx
+
+# 기본 설정 제거
+- name: Remove default server block
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d/default.conf
+    state: absent
+  notify: Restart nginx
+
+# Nginx 시작
+- name: Start and enable Nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+# Firewall 포트 오픈
+- name: Open HTTP port
+  ansible.posix.firewalld:
+    service: http
+    permanent: yes
+    state: enabled
+    immediate: yes

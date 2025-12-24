@@ -1,0 +1,140 @@
+---
+# JDK 21 설치
+- name: Install JDK 21
+  ansible.builtin.dnf:
+    name: java-21-openjdk-devel
+    state: present
+
+# WildFly 사용자 생성
+- name: Create wildfly group
+  ansible.builtin.group:
+    name: wildfly
+    system: yes
+
+- name: Create wildfly user
+  ansible.builtin.user:
+    name: wildfly
+    group: wildfly
+    shell: /sbin/nologin
+    system: yes
+    create_home: no
+
+# WildFly 다운로드 및 설치
+- name: Download WildFly
+  ansible.builtin.get_url:
+    url: "https://github.com/wildfly/wildfly/releases/download/{{ wildfly_version }}/wildfly-{{ wildfly_version }}.tar.gz"
+    dest: /tmp/wildfly.tar.gz
+    mode: '0644'
+
+- name: Create /opt directory
+  ansible.builtin.file:
+    path: /opt
+    state: directory
+    mode: '0755'
+
+- name: Extract WildFly
+  ansible.builtin.unarchive:
+    src: /tmp/wildfly.tar.gz
+    dest: /opt
+    remote_src: yes
+    creates: "/opt/wildfly-{{ wildfly_version }}"
+
+- name: Create symlink to wildfly
+  ansible.builtin.file:
+    src: "/opt/wildfly-{{ wildfly_version }}"
+    dest: /opt/wildfly
+    state: link
+
+- name: Set ownership of WildFly directory
+  ansible.builtin.file:
+    path: "/opt/wildfly-{{ wildfly_version }}"
+    owner: wildfly
+    group: wildfly
+    recurse: yes
+
+# PostgreSQL JDBC 드라이버 설치
+- name: Create module directory for PostgreSQL JDBC
+  ansible.builtin.file:
+    path: /opt/wildfly/modules/system/layers/base/org/postgresql/main
+    state: directory
+    owner: wildfly
+    group: wildfly
+    mode: '0755'
+
+- name: Download PostgreSQL JDBC driver
+  ansible.builtin.get_url:
+    url: "https://jdbc.postgresql.org/download/postgresql-42.7.3.jar"
+    dest: /opt/wildfly/modules/system/layers/base/org/postgresql/main/postgresql-42.7.3.jar
+    owner: wildfly
+    group: wildfly
+    mode: '0644'
+
+- name: Create module.xml for PostgreSQL
+  ansible.builtin.template:
+    src: module.xml.j2
+    dest: /opt/wildfly/modules/system/layers/base/org/postgresql/main/module.xml
+    owner: wildfly
+    group: wildfly
+    mode: '0644'
+
+# WildFly systemd 서비스 설정
+- name: Create WildFly systemd service
+  ansible.builtin.template:
+    src: wildfly.service.j2
+    dest: /etc/systemd/system/wildfly.service
+    mode: '0644'
+  notify: Restart wildfly
+
+- name: Create WildFly launch script
+  ansible.builtin.template:
+    src: launch.sh.j2
+    dest: /opt/wildfly/bin/launch.sh
+    owner: wildfly
+    group: wildfly
+    mode: '0755'
+
+# WildFly 시작
+- name: Start and enable WildFly
+  ansible.builtin.systemd:
+    name: wildfly
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+# WildFly 시작 대기
+- name: Wait for WildFly to start
+  ansible.builtin.wait_for:
+    port: 8080
+    delay: 10
+    timeout: 120
+
+# Datasource 설정 (JBoss CLI)
+- name: Create datasource CLI script
+  ansible.builtin.template:
+    src: configure-datasource.cli.j2
+    dest: /tmp/configure-datasource.cli
+    mode: '0644'
+
+- name: Check if datasource exists
+  ansible.builtin.command: >
+    /opt/wildfly/bin/jboss-cli.sh --connect
+    --command="/subsystem=datasources/data-source=PostgreSQLDS:read-resource"
+  register: ds_check
+  failed_when: false
+  changed_when: false
+
+- name: Configure datasource via CLI
+  ansible.builtin.command: /opt/wildfly/bin/jboss-cli.sh --connect --file=/tmp/configure-datasource.cli
+  when: ds_check.rc != 0
+  notify: Restart wildfly
+
+# Firewall 포트 오픈
+- name: Open WildFly ports
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - 8080/tcp
+    - 9990/tcp
